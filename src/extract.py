@@ -96,7 +96,7 @@ def collect_items(rss_feeds: list[str], seed_pages: list[str], max_items: int = 
 
 
 # ----------------------------
-# Tier 1: relevance filter
+# Tier 1: relevance filter (UPDATED)
 # ----------------------------
 
 def is_signal_candidate(item: dict) -> bool:
@@ -107,13 +107,22 @@ def is_signal_candidate(item: dict) -> bool:
         return True
 
     prompt = (
-        "Decide if this content is relevant to sustainable residential development.\n\n"
-        "YES if it involves:\n"
-        "- housing or greenfield developments\n"
-        "- sustainable infrastructure (water, drainage, landscape)\n"
-        "- construction materials or products\n\n"
-        "NO if generic news, policy, or unrelated.\n\n"
-        f"TITLE:\n{title}\n\nSNIPPET:\n{snippet}"
+        "Decide if this content is relevant to sustainable GREENFIELD RESIDENTIAL development.\n\n"
+
+        "YES only if it clearly involves:\n"
+        "- residential housing developments or masterplanned communities\n"
+        "- subdivision-scale infrastructure (roads, drainage, utilities, landscape)\n"
+        "- sustainable materials or products used in housing developments\n\n"
+
+        "NO if it is primarily:\n"
+        "- large infrastructure (rail, airports, metros, stadiums)\n"
+        "- commercial or retail developments\n"
+        "- generic construction news\n"
+        "- corporate or financial news\n\n"
+
+        f"TITLE:\n{title}\n\n"
+        f"SNIPPET:\n{snippet}\n\n"
+        "Answer YES or NO."
     )
 
     try:
@@ -147,7 +156,7 @@ def is_signal_candidate(item: dict) -> bool:
 
 
 # ----------------------------
-# Tier 2: extraction
+# Tier 2: extraction (unchanged)
 # ----------------------------
 
 def extract_company_record(item: dict) -> dict | None:
