@@ -95,9 +95,51 @@ def dedupe_by_url(items):
     return out
 
 
+# ----------------------------
+# NEW: Tier-3 Post Extraction Filter
+# ----------------------------
+def is_valid_record(record: dict) -> bool:
+    name = (record.get("name") or "").lower()
+    summary = (record.get("summary") or "").lower()
+    tags = [t.lower() for t in record.get("tags", [])]
+
+    # Reject marketing / non-signal content
+    bad_keywords = [
+        "membership",
+        "subscribe",
+        "webinar",
+        "event",
+        "award",
+        "newsletter",
+        "advertise",
+        "digital solution",
+    ]
+
+    for k in bad_keywords:
+        if k in name or k in summary:
+            return False
+
+    # Reject off-scope developments
+    off_scope = [
+        "warehouse",
+        "airport",
+        "stadium",
+        "hotel",
+        "commercial",
+        "office",
+        "industrial",
+    ]
+
+    for k in off_scope:
+        if k in summary or k in tags:
+            return False
+
+    return True
+
+
 def run():
     # ----------------------------
-    # 🔍 OPENAI CONNECTION TEST (RAW REQUEST)
+    # 🔍 OPENAI CONNECTION TEST
     # ----------------------------
     print("Testing OpenAI connection (raw request)...")
 
@@ -106,9 +148,7 @@ def run():
     try:
         r = requests.get(
             "https://api.openai.com/v1/models",
-            headers={
-                "Authorization": f"Bearer {api_key}"
-            },
+            headers={"Authorization": f"Bearer {api_key}"},
             timeout=20
         )
 
@@ -131,8 +171,6 @@ def run():
         token=os.environ.get("NOTION_TOKEN", ""),
         database_id=os.environ.get("NOTION_DATABASE_ID", ""),
     )
-
-    debug_match = os.getenv("DEBUG_MATCH", "").strip().lower()
 
     state = load_state()
 
@@ -189,9 +227,7 @@ def run():
             print("Tier-1: Not relevant — skipping")
             continue
 
-        # ----------------------------
-        # NEW: Skip Google News URLs
-        # ----------------------------
+        # Skip Google News wrapper URLs
         if "news.google.com" in url:
             print("Skipping Google News wrapper URL")
             continue
@@ -206,6 +242,13 @@ def run():
             continue
 
         if not record:
+            continue
+
+        # ----------------------------
+        # NEW: Apply Tier-3 filter
+        # ----------------------------
+        if not is_valid_record(record):
+            print("Filtered out post-extraction")
             continue
 
         extracted += 1
