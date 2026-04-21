@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from dateutil import tz
-import requests  # <-- ADDED
+import requests
 
 from .sources import (
     RSS_FEEDS,
@@ -136,6 +136,9 @@ def run():
 
     state = load_state()
 
+    # ----------------------------
+    # 1) Watch pages
+    # ----------------------------
     watch_items = []
     if WATCH_WEBPAGES:
         print(f"Checking {len(WATCH_WEBPAGES)} watch pages for changes...")
@@ -145,14 +148,23 @@ def run():
 
     save_state(state)
 
+    # ----------------------------
+    # 2) Collect RSS + seed pages
+    # ----------------------------
     rss_max = int(os.getenv("RSS_MAX_ITEMS", "200"))
     print(f"Collecting items (max_items={rss_max})...")
     base_items = collect_items(RSS_FEEDS, SEED_WEBPAGES, max_items=rss_max)
 
     merged_items = dedupe_by_url(watch_items + base_items)
 
+    # ----------------------------
+    # 3) URL gating
+    # ----------------------------
     before = len(merged_items)
-    merged_items = [it for it in merged_items if url_is_worth_processing(it.get("url"))]
+    merged_items = [
+        it for it in merged_items
+        if url_is_worth_processing(it.get("url"))
+    ]
     after = len(merged_items)
     print(f"URL gating: kept {after}/{before} items")
 
@@ -160,6 +172,9 @@ def run():
     merged_items = merged_items[:max_total]
     print(f"Post-cap items: {len(merged_items)}")
 
+    # ----------------------------
+    # 4) Processing
+    # ----------------------------
     screened = 0
     tier1_yes = 0
     extracted = 0
@@ -172,6 +187,13 @@ def run():
 
         if not is_signal_candidate(item):
             print("Tier-1: Not relevant — skipping")
+            continue
+
+        # ----------------------------
+        # NEW: Skip Google News URLs
+        # ----------------------------
+        if "news.google.com" in url:
+            print("Skipping Google News wrapper URL")
             continue
 
         tier1_yes += 1
