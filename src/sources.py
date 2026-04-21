@@ -10,7 +10,7 @@ from io import StringIO
 
 
 # ============================================================
-# GOOGLE NEWS RSS (Generated Query Feeds)
+# GOOGLE NEWS RSS (Structured Recall Layer)
 # ============================================================
 
 def google_news_rss_url(query: str, hl: str = "en-AU", gl: str = "AU", ceid: str = "AU:en") -> str:
@@ -24,109 +24,96 @@ def google_news_feeds() -> list[str]:
     ceid = os.getenv("GNEWS_CEID", "AU:en")
 
     queries = [
-        '(construction tech OR contech) (startup OR funding OR raises OR "Series A" OR "Series B")',
-        '(AEC OR "built environment") (startup OR funding OR investment)',
-        '(infrastructure technology) (startup OR funding OR raises)',
-        '(construction robotics) (startup OR funding OR raises)',
-        '(construction AI) (startup OR funding OR raises)',
-        '("digital twin" startup) (funding OR raises)',
-        '(BIM startup) (funding OR raises)',
-        '(geospatial startup OR GIS startup) (funding OR raises)',
-        '(LiDAR startup OR reality capture startup) (funding OR raises)',
-        '(asset management software startup) (funding OR raises)',
-        '(grid software OR grid modelling OR grid modeling) (startup OR funding OR raises)',
-        '(utility software startup) (funding OR raises)',
-        '(climate resilience software startup) (funding OR raises)',
-        '(wildfire modelling software startup) (funding OR raises)',
-        '(flood modelling software startup) (funding OR raises)',
-        '(critical infrastructure AI startup) (funding OR raises)',
-        '(proptech startup) (funding OR raises)',
-        '(urban planning software startup) (funding OR raises)',
-        '(construction startup) (acquired OR acquisition)',
-        '(infrastructure startup) (acquired OR acquisition)',
-        '(engineering software startup) ("Series A" OR "Series B" OR acquisition)',
-        '(construction tech partnership) (startup OR platform)',
-        '(Australian startup) (construction OR infrastructure OR geospatial) (funding OR raises)',
-        '(Australia) (construction tech OR contech OR digital twin OR geospatial) (startup OR funding)',
-        'Neara (funding OR raises OR "Series D" OR valuation OR "funding round")',
-        '"Neara" (grid OR utility OR infrastructure) (funding OR raises OR valuation)',
-        '"Neura Robotics" (funding OR raises OR round OR valuation)',
-        'Neura (humanoid OR robotics) (funding OR raises OR valuation)',
+        # --- Greenfield / residential developments ---
+        '(greenfield development OR "masterplanned community") (sustainable OR "net zero" OR renewable) (Australia OR UK OR US OR Europe)',
+        '(residential development) (sustainability OR "net zero community") (Australia OR UK OR US)',
+        '(housing development) (sustainable OR "low carbon" OR "climate resilient")',
+
+        # --- Subdivision / planning ---
+        '(subdivision design OR land development) (sustainable OR drainage OR water)',
+        '(urban planning) (greenfield OR "new community") (sustainability OR resilience)',
+
+        # --- Water / WSUD ---
+        '(stormwater management) (residential OR subdivision) (sustainable OR innovation)',
+        '("water sensitive urban design" OR WSUD) (project OR development)',
+        '(flood mitigation) (housing development OR community)',
+
+        # --- Materials / products ---
+        '(permeable paving OR porous concrete) (development OR project)',
+        '(green concrete OR low carbon concrete) (residential OR housing)',
+        '(sustainable construction materials) (housing OR residential)',
+
+        # --- Lower priority: energy (context only) ---
+        '(residential development) (solar OR battery OR microgrid OR EV infrastructure)',
     ]
 
     return [google_news_rss_url(q, hl=hl, gl=gl, ceid=ceid) for q in queries]
 
 
 # ============================================================
-# RSS FEEDS
+# RSS FEEDS (Precision Layer)
 # ============================================================
 
 RSS_FEEDS = [
-    "https://www.constructiondive.com/feeds/news/",
-    "https://www.geekwire.com/tag/construction-tech/feed/",
-    "https://techcrunch.com/tag/construction/feed/",
-    "https://techcrunch.com/category/startups/feed/",
-    "https://techcrunch.com/tag/funding/feed/",
-    "https://www.builtworlds.com/feed/",
-    "https://www.globalconstructionreview.com/feed/",
-    "https://www.pbctoday.co.uk/news/feed/",
-    "https://constructionexec.com/rss",
-    "https://www.enr.com/rss/topic/1004-construction-tech",
-    "https://www.utilitydive.com/feeds/news/",
-    "https://www.smart-energy.com/feed/",
-    "https://energynews.us/feed/",
-    "https://www.power-eng.com/feed/",
-    "https://www.tdworld.com/rss.xml",
-    "https://www.climatechangenews.com/feed/",
+    # --- Australian development / planning ---
+    "https://www.theurbandeveloper.com/feed",
+    "https://www.urban.com.au/news.rss",
+    "https://www.propertycouncil.com.au/Web/Content/News/News_RSS.aspx",
+
+    # --- Architecture / housing projects ---
+    "https://www.archdaily.com/rss/tag/housing",
+    "https://www.architectureanddesign.com.au/news/rss",
+
+    # --- Sustainability applied ---
     "https://www.greenbiz.com/rss.xml",
-    "https://www.energymonitor.ai/feed/",
-    "https://climatecapitalmedia.com/feed/",
-    "https://www.geoweeknews.com/rss",
-    "https://www.gim-international.com/rss",
-    "https://www.xyht.com/feed/",
-    "https://www.spatialsource.com.au/feed/",
-    "https://www.geospatialworld.net/feed/",
-    "https://www.directionsmag.com/rss",
-    "https://propmodo.com/feed/",
-    "https://therealdeal.com/feed/",
-    "https://www.proptechbuzz.com/feed/",
-    "https://www.smartcitiesworld.net/rss",
-    "https://tech.eu/feed/",
-    "https://www.eu-startups.com/feed/",
-    "https://venturebeat.com/feed/",
-    "https://www.sifted.eu/feed/",
-    "https://www.finsmes.com/feed",
-    "https://www.startupdaily.net/feed/",
-    "https://www.smartcompany.com.au/feed/",
-    "https://www.aumanufacturing.com.au/feed",
-    "https://www.innovationaus.com/feed/",
-    "https://www.reuters.com/markets/deals/rss",
-    "https://www.marketwatch.com/rss/topstories",
-    "https://www.infrastructure.gov.au/media-centre/rss.xml",
-    "https://www.artificialintelligence-news.com/feed/",
-    "https://www.unite.ai/feed/",
-    "https://www.marktechpost.com/feed/",
+    "https://www.climatechangenews.com/feed/",
+
+    # --- Water / WSUD / landscape ---
+    "https://watersensitivecities.org.au/news/feed/",
+    "https://www.stormwater.com/rss/all",
+    "https://www.landscapeaustralia.com/feed/",
+
+    # --- Materials / products ---
+    "https://www.constructiondive.com/topic/materials/rss/",
+    "https://www.pbctoday.co.uk/news/category/materials/feed/",
+    "https://www.dezeen.com/tag/sustainable-materials/feed/",
+
+    # --- General construction / infrastructure ---
+    "https://www.globalconstructionreview.com/feed/",
+    "https://www.infrastructuremagazine.com.au/feed/",
+
+    # --- Google News recall layer ---
     *google_news_feeds(),
 ]
 
 
 # ============================================================
-# SEED WEBPAGES (RESTORED)
+# SEED WEBPAGES
 # ============================================================
 
 SEED_WEBPAGES = [
-    "https://www.builtworlds.com/",
+    "https://www.theurbandeveloper.com/",
+    "https://www.archdaily.com/",
 ]
 
 
 # ============================================================
-# WATCH WEBPAGES
+# WATCH WEBPAGES (High Precision Tracking)
 # ============================================================
 
 WATCH_WEBPAGES = [
-    "https://www.trimble.com/en/our-company/events/dimensions/experiences/0-60-challenge",
-    "https://neara.com/resources/press/",
-    "https://neara.com/resources/press/neara-raises-90-million-to-solve-the-global-infrastructure-crisis-with-ai/",
+    # --- Australian developers ---
+    "https://www.stockland.com.au/residential/news",
+    "https://www.mirvac.com/residential/news",
+    "https://www.lendlease.com/au/media-centre/",
+    "https://www.frasersproperty.com.au/news",
+
+    # --- Sustainability case studies ---
+    "https://www.gbca.org.au/case-studies/",
+    "https://www.worldgbc.org/case-study-library",
+
+    # --- Water-focused org ---
+    "https://watersensitivecities.org.au/resources/",
 ]
 
 
