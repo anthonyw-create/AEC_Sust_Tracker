@@ -5,6 +5,8 @@ from pathlib import Path
 from datetime import datetime
 from dateutil import tz
 
+from openai import OpenAI  # <-- ADDED
+
 from .sources import (
     RSS_FEEDS,
     SEED_WEBPAGES,
@@ -99,6 +101,22 @@ def dedupe_by_url(items):
 
 
 def run():
+    # ----------------------------
+    # 🔍 OPENAI CONNECTION TEST (ADDED)
+    # ----------------------------
+    print("Testing OpenAI connection...")
+    try:
+        client = OpenAI()
+        resp = client.models.list()
+        print(f"OpenAI OK: {len(resp.data)} models available")
+    except Exception as e:
+        print("OpenAI FAILED:", str(e))
+        raise
+
+    # ----------------------------
+    # Existing pipeline
+    # ----------------------------
+
     notion = NotionDB(
         token=os.environ["NOTION_TOKEN"],
         database_id=os.environ["NOTION_DATABASE_ID"],
@@ -195,9 +213,6 @@ def run():
     print(f"Screened: {screened} | Tier1 YES: {tier1_yes} | Extracted: {extracted}")
     print(f"Created: {len(created)} | Updated: {len(updated)}")
 
-    # ----------------------------
-    # 5) Final output (no email)
-    # ----------------------------
     if not (created or updated):
         print("No new or updated records.")
     else:
