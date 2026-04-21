@@ -96,7 +96,7 @@ def collect_items(rss_feeds: list[str], seed_pages: list[str], max_items: int = 
 
 
 # ----------------------------
-# Tier 1: relevance filter (UPDATED)
+# Tier 1: relevance filter
 # ----------------------------
 
 def is_signal_candidate(item: dict) -> bool:
@@ -156,7 +156,7 @@ def is_signal_candidate(item: dict) -> bool:
 
 
 # ----------------------------
-# Tier 2: extraction (unchanged)
+# Tier 2: extraction (UPDATED)
 # ----------------------------
 
 def extract_company_record(item: dict) -> dict | None:
@@ -175,11 +175,23 @@ def extract_company_record(item: dict) -> dict | None:
         return None
 
     prompt = (
-        "Extract structured info from this content.\n\n"
-        "Classify as one of:\n"
-        "- Project (development)\n"
-        "- Product (material/system)\n"
-        "- Company\n\n"
+        "Extract structured information from the content below.\n\n"
+
+        "Only return results if the content describes ONE of the following:\n"
+        "1. A residential development project (housing, subdivision, masterplanned community)\n"
+        "2. A physical product or material used in residential development (e.g. paving, concrete, drainage systems)\n\n"
+
+        "Ignore and return null if the content is:\n"
+        "- marketing or lifestyle-focused\n"
+        "- general real estate advice\n"
+        "- investment, retail, or commercial content\n"
+        "- generic architecture or design discussion\n\n"
+
+        "Focus ONLY on:\n"
+        "- physical development features\n"
+        "- sustainability measures (water, energy, materials, biodiversity)\n"
+        "- infrastructure systems\n\n"
+
         "Return JSON:\n"
         "{\n"
         '  "name": string,\n'
@@ -189,7 +201,8 @@ def extract_company_record(item: dict) -> dict | None:
         '  "location": string,\n'
         '  "confidence": number\n'
         "}\n\n"
-        "Return null if irrelevant.\n\n"
+
+        "Return null if the content does not meet the criteria.\n\n"
         f"CONTENT:\n{text[:6000]}"
     )
 
