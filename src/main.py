@@ -104,14 +104,20 @@ def run():
     # ----------------------------
     # 🔍 OPENAI CONNECTION TEST (ADDED)
     # ----------------------------
-    print("Testing OpenAI connection...")
-    try:
-        client = OpenAI()
-        resp = client.models.list()
-        print(f"OpenAI OK: {len(resp.data)} models available")
-    except Exception as e:
-        print("OpenAI FAILED:", str(e))
-        raise
+from openai import OpenAI
+import httpx
+
+print("Testing OpenAI connection...")
+
+try:
+    client = OpenAI(
+        http_client=httpx.Client(timeout=30.0)
+    )
+    resp = client.models.list()
+    print(f"OpenAI OK: {len(resp.data)} models available")
+except Exception as e:
+    print("OpenAI FAILED:", str(e))
+    raise
 
     # ----------------------------
     # Existing pipeline
