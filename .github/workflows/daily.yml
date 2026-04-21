@@ -1,4 +1,4 @@
-name: Daily startup agent
+name: Sustainable development tracker
 
 on:
   schedule:
@@ -27,9 +27,6 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
           AGENT_TZ: ${{ secrets.AGENT_TZ }}
         run: python -m src.main
 
