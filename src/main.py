@@ -4,9 +4,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from dateutil import tz
-
-from openai import OpenAI
-import httpx
+import requests  # <-- ADDED
 
 from .sources import (
     RSS_FEEDS,
@@ -99,18 +97,30 @@ def dedupe_by_url(items):
 
 def run():
     # ----------------------------
-    # 🔍 OPENAI CONNECTION TEST
+    # 🔍 OPENAI CONNECTION TEST (RAW REQUEST)
     # ----------------------------
-    print("Testing OpenAI connection...")
+    print("Testing OpenAI connection (raw request)...")
+
+    api_key = os.getenv("OPENAI_API_KEY")
 
     try:
-        client = OpenAI(
-            http_client=httpx.Client(timeout=30.0)
+        r = requests.get(
+            "https://api.openai.com/v1/models",
+            headers={
+                "Authorization": f"Bearer {api_key}"
+            },
+            timeout=20
         )
-        resp = client.models.list()
-        print(f"OpenAI OK: {len(resp.data)} models available")
+
+        print("Status code:", r.status_code)
+
+        if r.status_code == 200:
+            print("OpenAI OK (raw request working)")
+        else:
+            print("OpenAI FAILED:", r.text)
+
     except Exception as e:
-        print("OpenAI FAILED:", str(e))
+        print("OpenAI FAILED (network):", str(e))
         raise
 
     # ----------------------------
@@ -149,9 +159,6 @@ def run():
     max_total = int(os.getenv("MAX_ITEMS_TOTAL", "300"))
     merged_items = merged_items[:max_total]
     print(f"Post-cap items: {len(merged_items)}")
-
-    created = []
-    updated = []
 
     screened = 0
     tier1_yes = 0
