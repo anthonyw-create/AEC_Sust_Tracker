@@ -18,7 +18,6 @@ from .extract import (
 )
 from .dedupe import make_dedupe_key
 from .notion_client import NotionDB
-from .emailer import send_digest_email
 
 
 # Force state.json to live at repo root (one level above /src)
@@ -105,14 +104,10 @@ def run():
         database_id=os.environ["NOTION_DATABASE_ID"],
     )
 
-    # ============================================================
-    # DEBUG: trace a keyword through the pipeline (e.g. "neara")
-    # Set env var DEBUG_MATCH=neara
-    # ============================================================
     debug_match = os.getenv("DEBUG_MATCH", "").strip().lower()
 
     # ----------------------------
-    # 1) Watch pages (delta emission)
+    # 1) Watch pages
     # ----------------------------
     state = load_state()
 
@@ -129,7 +124,7 @@ def run():
     # 2) Collect RSS + seed pages
     # ----------------------------
     rss_max = int(os.getenv("RSS_MAX_ITEMS", "200"))
-    print(f"Collecting items from RSS + seed webpages (max_items={rss_max})...")
+    print(f"Collecting items (max_items={rss_max})...")
     base_items = collect_items(RSS_FEEDS, SEED_WEBPAGES, max_items=rss_max)
 
     merged_items = dedupe_by_url(watch_items + base_items)
@@ -142,13 +137,12 @@ def run():
     after = len(merged_items)
     print(f"URL gating: kept {after}/{before} items")
 
-    # Optional global cap
     max_total = int(os.getenv("MAX_ITEMS_TOTAL", "300"))
     merged_items = merged_items[:max_total]
-    print(f"Post-cap items: {len(merged_items)} (MAX_ITEMS_TOTAL={max_total})")
+    print(f"Post-cap items: {len(merged_items)}")
 
     # ----------------------------
-    # 4) Tier-1 + Tier-2 processing with counters
+    # 4) Processing
     # ----------------------------
     created = []
     updated = []
@@ -164,12 +158,11 @@ def run():
         title = (item.get("title") or "")
         snippet = (item.get("snippet") or "")
 
-        # Debug trace: show any items matching keyword anywhere in url/title/snippet
         if debug_match:
             hay = f"{url}\n{title}\n{snippet}".lower()
             if debug_match in hay:
                 debug_hits += 1
-                print(f"DEBUG_MATCH HIT ({debug_hits}): url={url} | title={title[:140]}")
+                print(f"DEBUG_MATCH HIT ({debug_hits}): {url}")
 
         print(f"Screening: {url}")
 
@@ -197,25 +190,18 @@ def run():
             updated.append(record)
 
     if debug_match:
-        print(f"DEBUG_MATCH summary: '{debug_match}' hits seen in candidates: {debug_hits}")
+        print(f"DEBUG_MATCH summary: {debug_hits}")
 
     print(f"Screened: {screened} | Tier1 YES: {tier1_yes} | Extracted: {extracted}")
     print(f"Created: {len(created)} | Updated: {len(updated)}")
 
     # ----------------------------
-    # 5) Email digest
+    # 5) Final output (no email)
     # ----------------------------
-    if created or updated:
-        send_digest_email(
-            sendgrid_key=os.environ["SENDGRID_API_KEY"],
-            email_from=os.environ["EMAIL_FROM"],
-            email_to=os.environ["EMAIL_TO"],
-            created=created,
-            updated=updated,
-            run_time=now_local(),
-        )
+    if not (created or updated):
+        print("No new or updated records.")
     else:
-        print("No changes — no email sent.")
+        print("Run complete — data written to Notion.")
 
 
 if __name__ == "__main__":
