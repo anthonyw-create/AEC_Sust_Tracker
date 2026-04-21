@@ -21,7 +21,6 @@ from .dedupe import make_dedupe_key
 from .notion_client import NotionDB
 
 
-# Force state.json to live at repo root (one level above /src)
 STATE_PATH = Path(__file__).resolve().parents[1] / "state.json"
 
 
@@ -96,51 +95,65 @@ def dedupe_by_url(items):
 
 
 # ----------------------------
-# NEW: Tier-3 Post Extraction Filter
+# UPDATED Tier-3 Filter (STRONGER)
 # ----------------------------
 def is_valid_record(record: dict) -> bool:
     name = (record.get("name") or "").lower()
     summary = (record.get("summary") or "").lower()
     tags = [t.lower() for t in record.get("tags", [])]
 
-    # Reject marketing / non-signal content
+    # ----------------------------
+    # 1. Reject obvious junk
+    # ----------------------------
     bad_keywords = [
-        "membership",
-        "subscribe",
-        "webinar",
-        "event",
-        "award",
-        "newsletter",
-        "advertise",
-        "digital solution",
+        "membership", "subscribe", "webinar", "event",
+        "award", "newsletter", "advertise", "digital solution",
     ]
 
     for k in bad_keywords:
         if k in name or k in summary:
             return False
 
-    # Reject off-scope developments
+    # ----------------------------
+    # 2. Reject off-scope asset types
+    # ----------------------------
     off_scope = [
-        "warehouse",
-        "airport",
-        "stadium",
-        "hotel",
-        "commercial",
-        "office",
-        "industrial",
+        "warehouse", "airport", "stadium", "hotel",
+        "commercial", "office", "industrial",
     ]
 
     for k in off_scope:
         if k in summary or k in tags:
             return False
 
+    # ----------------------------
+    # 3. Reject weak / conceptual signals
+    # ----------------------------
+    weak_signal = [
+        "urbanism", "architecture", "design exploration",
+        "video", "interview", "concept",
+    ]
+
+    for k in weak_signal:
+        if k in summary or k in tags:
+            return False
+
+    # ----------------------------
+    # 4. REQUIRE residential relevance
+    # ----------------------------
+    required_signals = [
+        "residential", "housing", "subdivision",
+        "estate", "community", "masterplan",
+        "land development", "housing estate",
+    ]
+
+    if not any(k in summary for k in required_signals):
+        return False
+
     return True
 
 
 def run():
-    # ----------------------------
-    # 🔍 OPENAI CONNECTION TEST
-    # ----------------------------
     print("Testing OpenAI connection (raw request)...")
 
     api_key = os.getenv("OPENAI_API_KEY")
@@ -163,10 +176,6 @@ def run():
         print("OpenAI FAILED (network):", str(e))
         raise
 
-    # ----------------------------
-    # Existing pipeline
-    # ----------------------------
-
     notion = NotionDB(
         token=os.environ.get("NOTION_TOKEN", ""),
         database_id=os.environ.get("NOTION_DATABASE_ID", ""),
@@ -174,9 +183,6 @@ def run():
 
     state = load_state()
 
-    # ----------------------------
-    # 1) Watch pages
-    # ----------------------------
     watch_items = []
     if WATCH_WEBPAGES:
         print(f"Checking {len(WATCH_WEBPAGES)} watch pages for changes...")
@@ -186,18 +192,12 @@ def run():
 
     save_state(state)
 
-    # ----------------------------
-    # 2) Collect RSS + seed pages
-    # ----------------------------
     rss_max = int(os.getenv("RSS_MAX_ITEMS", "200"))
     print(f"Collecting items (max_items={rss_max})...")
     base_items = collect_items(RSS_FEEDS, SEED_WEBPAGES, max_items=rss_max)
 
     merged_items = dedupe_by_url(watch_items + base_items)
 
-    # ----------------------------
-    # 3) URL gating
-    # ----------------------------
     before = len(merged_items)
     merged_items = [
         it for it in merged_items
@@ -210,9 +210,6 @@ def run():
     merged_items = merged_items[:max_total]
     print(f"Post-cap items: {len(merged_items)}")
 
-    # ----------------------------
-    # 4) Processing
-    # ----------------------------
     screened = 0
     tier1_yes = 0
     extracted = 0
@@ -227,7 +224,6 @@ def run():
             print("Tier-1: Not relevant — skipping")
             continue
 
-        # Skip Google News wrapper URLs
         if "news.google.com" in url:
             print("Skipping Google News wrapper URL")
             continue
@@ -244,9 +240,6 @@ def run():
         if not record:
             continue
 
-        # ----------------------------
-        # NEW: Apply Tier-3 filter
-        # ----------------------------
         if not is_valid_record(record):
             print("Filtered out post-extraction")
             continue
@@ -255,7 +248,6 @@ def run():
 
         record["dedupe_key"] = make_dedupe_key(record)
 
-        # TEMP: disable Notion writes for debugging
         print("EXTRACTED:", record)
 
     print(f"Screened: {screened} | Tier1 YES: {tier1_yes} | Extracted: {extracted}")
