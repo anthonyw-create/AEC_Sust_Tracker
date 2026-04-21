@@ -114,48 +114,56 @@ def collect_items(rss_feeds: list[str], seed_pages: list[str], max_items: int = 
 # ----------------------------
 
 def is_signal_candidate(item: dict) -> bool:
-    """
-    Tier-1 cheap classifier to decide whether a URL is worth doing a full extraction.
-    Uses title + short snippet only (no page fetch).
-    Returns True if likely to contain AEC startup / innovation signal.
-    """
     title = (item.get("title") or "")[:200]
     snippet = (item.get("snippet") or "")[:900]
 
-    # If we have almost no context, let it pass (conservative)
     if not title.strip() and len(snippet.strip()) < 40:
         return True
 
     prompt = (
-        "You are screening content for an AEC / construction-tech intelligence tracker.\n"
-        "Decide if this looks like it contains a startup / innovation signal worth deeper extraction.\n\n"
-        "A 'YES' means it's likely about one or more of:\n"
-        "- a startup or product company relevant to AEC / construction tech\n"
-        "- an accelerator / cohort / challenge finalists\n"
-        "- funding / investment / acquisition involving an AEC-relevant startup\n"
-        "- a partnership/pilot where a named tech company is the product/platform\n\n"
-        "A 'NO' means it's mainly generic industry news, macro trends, policy, labour market, "
-        "or coverage of incumbents without a distinct product/company signal.\n\n"
+        "You are screening content for a sustainable residential development intelligence tracker.\n"
+        "Decide if this content is worth deeper analysis.\n\n"
+        "YES if it relates to:\n"
+        "- residential or greenfield developments\n"
+        "- sustainable infrastructure (water, drainage, landscape)\n"
+        "- construction materials (low carbon, permeable paving, etc.)\n"
+        "- applied sustainability in housing or subdivision design\n\n"
+        "NO if it is:\n"
+        "- generic ESG or climate news\n"
+        "- policy or politics\n"
+        "- unrelated industries\n\n"
         f"TITLE:\n{title}\n\n"
         f"SNIPPET:\n{snippet}\n\n"
-        "Answer with exactly one token: YES or NO."
+        "Answer YES or NO."
     )
 
     try:
-        resp = client.chat.completions.create(
-            model=os.getenv("TIER1_MODEL", "gpt-4o-mini"),
-            messages=[
-                {"role": "system", "content": "Return exactly one token: YES or NO."},
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=3,
-            temperature=0,
+        r = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": "Answer YES or NO only."},
+                    {"role": "user", "content": prompt},
+                ],
+                "max_tokens": 3,
+                "temperature": 0,
+            },
+            timeout=30,
         )
-        raw = (resp.choices[0].message.content or "").strip().upper()
+
+        if r.status_code != 200:
+            return True  # fail open
+
+        raw = r.json()["choices"][0]["message"]["content"].strip().upper()
         return raw.startswith("YES")
+
     except Exception as e:
-        # Fail-open: better to extract than miss signal
-        print(f"Tier-1 classification error (fail-open): {e}")
+        print("Tier-1 error:", e)
         return True
 
 
