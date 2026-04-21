@@ -5,7 +5,8 @@ from pathlib import Path
 from datetime import datetime
 from dateutil import tz
 
-from openai import OpenAI  # <-- ADDED
+from openai import OpenAI
+import httpx
 
 from .sources import (
     RSS_FEEDS,
@@ -25,10 +26,6 @@ from .notion_client import NotionDB
 # Force state.json to live at repo root (one level above /src)
 STATE_PATH = Path(__file__).resolve().parents[1] / "state.json"
 
-
-# ----------------------------
-# URL gating (noise reduction)
-# ----------------------------
 
 URL_DENYLIST = [
     r"/privacy",
@@ -102,37 +99,31 @@ def dedupe_by_url(items):
 
 def run():
     # ----------------------------
-    # 🔍 OPENAI CONNECTION TEST (ADDED)
+    # 🔍 OPENAI CONNECTION TEST
     # ----------------------------
-from openai import OpenAI
-import httpx
+    print("Testing OpenAI connection...")
 
-print("Testing OpenAI connection...")
-
-try:
-    client = OpenAI(
-        http_client=httpx.Client(timeout=30.0)
-    )
-    resp = client.models.list()
-    print(f"OpenAI OK: {len(resp.data)} models available")
-except Exception as e:
-    print("OpenAI FAILED:", str(e))
-    raise
+    try:
+        client = OpenAI(
+            http_client=httpx.Client(timeout=30.0)
+        )
+        resp = client.models.list()
+        print(f"OpenAI OK: {len(resp.data)} models available")
+    except Exception as e:
+        print("OpenAI FAILED:", str(e))
+        raise
 
     # ----------------------------
     # Existing pipeline
     # ----------------------------
 
     notion = NotionDB(
-        token=os.environ["NOTION_TOKEN"],
-        database_id=os.environ["NOTION_DATABASE_ID"],
+        token=os.environ.get("NOTION_TOKEN", ""),
+        database_id=os.environ.get("NOTION_DATABASE_ID", ""),
     )
 
     debug_match = os.getenv("DEBUG_MATCH", "").strip().lower()
 
-    # ----------------------------
-    # 1) Watch pages
-    # ----------------------------
     state = load_state()
 
     watch_items = []
@@ -144,18 +135,12 @@ except Exception as e:
 
     save_state(state)
 
-    # ----------------------------
-    # 2) Collect RSS + seed pages
-    # ----------------------------
     rss_max = int(os.getenv("RSS_MAX_ITEMS", "200"))
     print(f"Collecting items (max_items={rss_max})...")
     base_items = collect_items(RSS_FEEDS, SEED_WEBPAGES, max_items=rss_max)
 
     merged_items = dedupe_by_url(watch_items + base_items)
 
-    # ----------------------------
-    # 3) URL gating
-    # ----------------------------
     before = len(merged_items)
     merged_items = [it for it in merged_items if url_is_worth_processing(it.get("url"))]
     after = len(merged_items)
@@ -165,28 +150,16 @@ except Exception as e:
     merged_items = merged_items[:max_total]
     print(f"Post-cap items: {len(merged_items)}")
 
-    # ----------------------------
-    # 4) Processing
-    # ----------------------------
     created = []
     updated = []
 
     screened = 0
     tier1_yes = 0
     extracted = 0
-    debug_hits = 0
 
     for item in merged_items:
         screened += 1
         url = (item.get("url") or "")
-        title = (item.get("title") or "")
-        snippet = (item.get("snippet") or "")
-
-        if debug_match:
-            hay = f"{url}\n{title}\n{snippet}".lower()
-            if debug_match in hay:
-                debug_hits += 1
-                print(f"DEBUG_MATCH HIT ({debug_hits}): {url}")
 
         print(f"Screening: {url}")
 
@@ -197,32 +170,23 @@ except Exception as e:
         tier1_yes += 1
         print("Tier-1: Relevant — extracting")
 
-        record = extract_company_record(item)
+        try:
+            record = extract_company_record(item)
+        except Exception as e:
+            print("Extraction failed:", e)
+            continue
+
         if not record:
             continue
 
         extracted += 1
 
-        dedupe_key = make_dedupe_key(record)
-        record["dedupe_key"] = dedupe_key
+        record["dedupe_key"] = make_dedupe_key(record)
 
-        result = notion.upsert(record, item)
-
-        if result == "created":
-            created.append(record)
-        elif result == "updated":
-            updated.append(record)
-
-    if debug_match:
-        print(f"DEBUG_MATCH summary: {debug_hits}")
+        # TEMP: disable Notion writes for debugging
+        print("EXTRACTED:", record)
 
     print(f"Screened: {screened} | Tier1 YES: {tier1_yes} | Extracted: {extracted}")
-    print(f"Created: {len(created)} | Updated: {len(updated)}")
-
-    if not (created or updated):
-        print("No new or updated records.")
-    else:
-        print("Run complete — data written to Notion.")
 
 
 if __name__ == "__main__":
