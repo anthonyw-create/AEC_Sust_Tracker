@@ -90,15 +90,14 @@ RSS_FEEDS = [
 
 
 # ============================================================
-# SEED WEBPAGES (UPDATED WITH PLANTED LINKS)
+# SEED WEBPAGES (WITH PLANTED LINKS)
 # ============================================================
 
 SEED_WEBPAGES = [
-    # Existing
     "https://www.theurbandeveloper.com/",
     "https://www.archdaily.com/",
 
-    # 🔹 PLANTED HIGH-SIGNAL TEST LINKS
+    # Planted high-signal test links
     "https://en.wikipedia.org/wiki/Currumbin_Ecovillage",
     "https://en.wikipedia.org/wiki/BedZED",
     "https://en.wikipedia.org/wiki/Sharjah_Sustainable_City",
@@ -183,37 +182,7 @@ def collect_watch_items(watch_pages: list[str], state: dict):
 
 
 # ============================================================
-# GOOGLE SHEET INGESTION
-# ============================================================
-
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQbs9IJWh5JSxJXmzpr8AhPS8Pwxq3tHdOYWZ_I1qBulyZbGnF1X3JWdj8GmmTi-gAHbHEWy-dqskKV/pub?output=csv"
-
-
-def fetch_published_sheet(csv_url: str):
-    r = requests.get(csv_url, timeout=20)
-    r.raise_for_status()
-    return list(csv.DictReader(StringIO(r.text)))
-
-
-def collect_sheet_items(rows, state):
-    new_items = []
-
-    for row in rows:
-        url = row.get("website") or row.get("url")
-        if not url:
-            continue
-
-        new_items.append({
-            "url": url,
-            "source": "google_sheet",
-            "title": row.get("name"),
-        })
-
-    return new_items, state
-
-
-# ============================================================
-# MAIN COLLECTION (UPDATED)
+# MAIN COLLECTION (UPDATED - NO SHEET)
 # ============================================================
 
 def collect_all(state: dict):
@@ -223,15 +192,7 @@ def collect_all(state: dict):
     watch_items, state = collect_watch_items(WATCH_WEBPAGES, state)
     all_items.extend(watch_items)
 
-    # Google Sheet
-    try:
-        rows = fetch_published_sheet(GOOGLE_SHEET_CSV_URL)
-        sheet_items, state = collect_sheet_items(rows, state)
-        all_items.extend(sheet_items)
-    except Exception as e:
-        print(f"Sheet error: {e}")
-
-    # 🔹 NEW: targeted search ingestion
+    # Targeted search ingestion
     for q in SEARCH_QUERIES:
         links = google_search(q, num_results=5)
         for link in links:
