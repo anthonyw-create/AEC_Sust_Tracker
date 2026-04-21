@@ -24,101 +24,101 @@ def google_news_feeds() -> list[str]:
     ceid = os.getenv("GNEWS_CEID", "AU:en")
 
     queries = [
-        # --- Greenfield / residential developments ---
-        '(greenfield development OR "masterplanned community") (sustainable OR "net zero" OR renewable) (Australia OR UK OR US OR Europe)',
-        '(residential development) (sustainability OR "net zero community") (Australia OR UK OR US)',
-        '(housing development) (sustainable OR "low carbon" OR "climate resilient")',
-
-        # --- Subdivision / planning ---
-        '(subdivision design OR land development) (sustainable OR drainage OR water)',
-        '(urban planning) (greenfield OR "new community") (sustainability OR resilience)',
-
-        # --- Water / WSUD ---
-        '(stormwater management) (residential OR subdivision) (sustainable OR innovation)',
-        '("water sensitive urban design" OR WSUD) (project OR development)',
-        '(flood mitigation) (housing development OR community)',
-
-        # --- Materials / products ---
+        '(greenfield development OR "masterplanned community") (sustainable OR "net zero")',
+        '(residential development) (sustainability OR "low carbon")',
+        '(stormwater management) (residential OR subdivision)',
         '(permeable paving OR porous concrete) (development OR project)',
-        '(green concrete OR low carbon concrete) (residential OR housing)',
-        '(sustainable construction materials) (housing OR residential)',
-
-        # --- Lower priority: energy (context only) ---
-        '(residential development) (solar OR battery OR microgrid OR EV infrastructure)',
     ]
 
     return [google_news_rss_url(q, hl=hl, gl=gl, ceid=ceid) for q in queries]
 
 
 # ============================================================
-# RSS FEEDS (Precision Layer)
+# NEW: TARGETED SEARCH (NON-NEWS DISCOVERY)
+# ============================================================
+
+SEARCH_QUERIES = [
+    "greenfield residential development sustainability case study",
+    "masterplanned community water sensitive urban design",
+    "permeable paving residential subdivision product",
+    "low carbon concrete housing development",
+    "stormwater management residential subdivision design",
+]
+
+
+def google_search(query: str, num_results: int = 5):
+    headers = {"User-Agent": "Mozilla/5.0"}
+    url = f"https://www.google.com/search?q={quote_plus(query)}"
+
+    results = []
+
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        for a in soup.select("a"):
+            href = a.get("href")
+            if not href:
+                continue
+
+            if "/url?q=" in href:
+                link = href.split("/url?q=")[1].split("&")[0]
+                if "google.com" in link:
+                    continue
+                results.append(link)
+
+            if len(results) >= num_results:
+                break
+
+    except Exception as e:
+        print(f"Search error ({query}): {e}")
+
+    return results
+
+
+# ============================================================
+# RSS FEEDS
 # ============================================================
 
 RSS_FEEDS = [
-    # --- Australian development / planning ---
     "https://www.theurbandeveloper.com/feed",
-    "https://www.urban.com.au/news.rss",
-    "https://www.propertycouncil.com.au/Web/Content/News/News_RSS.aspx",
-
-    # --- Architecture / housing projects ---
     "https://www.archdaily.com/rss/tag/housing",
-    "https://www.architectureanddesign.com.au/news/rss",
-
-    # --- Sustainability applied ---
-    "https://www.greenbiz.com/rss.xml",
-    "https://www.climatechangenews.com/feed/",
-
-    # --- Water / WSUD / landscape ---
     "https://watersensitivecities.org.au/news/feed/",
-    "https://www.stormwater.com/rss/all",
-    "https://www.landscapeaustralia.com/feed/",
-
-    # --- Materials / products ---
-    "https://www.constructiondive.com/topic/materials/rss/",
-    "https://www.pbctoday.co.uk/news/category/materials/feed/",
     "https://www.dezeen.com/tag/sustainable-materials/feed/",
-
-    # --- General construction / infrastructure ---
-    "https://www.globalconstructionreview.com/feed/",
-    "https://www.infrastructuremagazine.com.au/feed/",
-
-    # --- Google News recall layer ---
     *google_news_feeds(),
 ]
 
 
 # ============================================================
-# SEED WEBPAGES
+# SEED WEBPAGES (UPDATED WITH PLANTED LINKS)
 # ============================================================
 
 SEED_WEBPAGES = [
+    # Existing
     "https://www.theurbandeveloper.com/",
     "https://www.archdaily.com/",
+
+    # 🔹 PLANTED HIGH-SIGNAL TEST LINKS
+    "https://en.wikipedia.org/wiki/Currumbin_Ecovillage",
+    "https://en.wikipedia.org/wiki/BedZED",
+    "https://en.wikipedia.org/wiki/Sharjah_Sustainable_City",
 ]
 
 
 # ============================================================
-# WATCH WEBPAGES (High Precision Tracking)
+# WATCH WEBPAGES
 # ============================================================
 
 WATCH_WEBPAGES = [
-    # --- Australian developers ---
     "https://www.stockland.com.au/residential/news",
     "https://www.mirvac.com/residential/news",
-    "https://www.lendlease.com/au/media-centre/",
-    "https://www.frasersproperty.com.au/news",
-
-    # --- Sustainability case studies ---
     "https://www.gbca.org.au/case-studies/",
-    "https://www.worldgbc.org/case-study-library",
-
-    # --- Water-focused org ---
     "https://watersensitivecities.org.au/resources/",
 ]
 
 
 # ============================================================
-# WATCH HELPERS
+# HELPERS
 # ============================================================
 
 def fetch_url(url: str) -> str:
@@ -167,36 +167,17 @@ def harvest_same_host_links(html: str, base_url: str, limit: int = 80) -> list[s
 def collect_watch_items(watch_pages: list[str], state: dict):
     new_items = []
     state.setdefault("watch_pages", {})
-    seen_cap = int(os.getenv("WATCH_SEEN_URLS_CAP", "400"))
 
     for url in watch_pages:
         try:
             html = fetch_url(url)
-            text = extract_main_text(html)
-            new_hash = compute_hash(text)
+            links = harvest_same_host_links(html, url)
 
-            page_state = state["watch_pages"].get(url, {})
-            old_hash = page_state.get("hash")
-            seen_list = page_state.get("seen_urls") or []
-            seen_set = set(seen_list)
-
-            if new_hash != old_hash:
-                if url not in seen_set:
-                    new_items.append({"url": url, "source": url, "kind": "watch_page"})
-
-                links = harvest_same_host_links(html, url)
-                fresh_links = [l for l in links if l not in seen_set and l != url]
-
-                for link in fresh_links:
-                    new_items.append({"url": link, "source": url, "kind": "watch_link"})
-
-                state["watch_pages"][url] = {
-                    "hash": new_hash,
-                    "seen_urls": (seen_list + [url] + fresh_links)[-seen_cap:],
-                }
+            for link in links:
+                new_items.append({"url": link, "source": url})
 
         except Exception as e:
-            print(f"Error checking watch page {url}: {e}")
+            print(f"Watch error {url}: {e}")
 
     return new_items, state
 
@@ -216,51 +197,48 @@ def fetch_published_sheet(csv_url: str):
 
 def collect_sheet_items(rows, state):
     new_items = []
-    state.setdefault("sheet_seen", [])
-    seen_set = set(state["sheet_seen"])
-    seen_cap = int(os.getenv("SHEET_SEEN_CAP", "1000"))
 
     for row in rows:
-        if not isinstance(row, dict):
-            continue
-
-        name = (row.get("startup_name") or row.get("name") or row.get("Startup") or "").strip()
-        website = (row.get("website") or row.get("url") or row.get("Website") or "").strip()
-
-        key = website or name
-
-        if not key or key in seen_set:
+        url = row.get("website") or row.get("url")
+        if not url:
             continue
 
         new_items.append({
-            "url": website or None,
+            "url": url,
             "source": "google_sheet",
-            "kind": "startup_seed",
-            "title": name,
-            "metadata": row,
+            "title": row.get("name"),
         })
 
-        seen_set.add(key)
-
-    state["sheet_seen"] = list(seen_set)[-seen_cap:]
     return new_items, state
 
 
 # ============================================================
-# MAIN COLLECTION
+# MAIN COLLECTION (UPDATED)
 # ============================================================
 
 def collect_all(state: dict):
     all_items = []
 
+    # Watch pages
     watch_items, state = collect_watch_items(WATCH_WEBPAGES, state)
     all_items.extend(watch_items)
 
+    # Google Sheet
     try:
         rows = fetch_published_sheet(GOOGLE_SHEET_CSV_URL)
         sheet_items, state = collect_sheet_items(rows, state)
         all_items.extend(sheet_items)
     except Exception as e:
         print(f"Sheet error: {e}")
+
+    # 🔹 NEW: targeted search ingestion
+    for q in SEARCH_QUERIES:
+        links = google_search(q, num_results=5)
+        for link in links:
+            all_items.append({
+                "url": link,
+                "source": "search",
+                "query": q,
+            })
 
     return all_items, state
